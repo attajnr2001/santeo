@@ -16,61 +16,67 @@ import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 
 const AggregatesAnalysisSummary = ({ data = [] }) => {
-  // Calculate summary statistics
+  // Filter valid numeric data
+  const getValidNumericData = () => {
+    return data.filter(
+      (item) =>
+        item &&
+        typeof item.aggregate === "number" &&
+        !isNaN(item.aggregate) &&
+        isFinite(item.aggregate) &&
+        typeof item.total === "number" &&
+        !isNaN(item.total) &&
+        isFinite(item.total)
+    );
+  };
+
   const getTotalCandidates = () => {
-    return data.reduce((sum, item) => sum + item.total, 0) || 0;
+    return (
+      getValidNumericData().reduce((sum, item) => sum + item.total, 0) || 0
+    );
   };
 
   const getTotalByGender = (gender) => {
-    return data.reduce((sum, item) => sum + item[gender.toLowerCase()], 0) || 0;
+    const key = gender.toLowerCase();
+    return getValidNumericData().reduce((sum, item) => {
+      const value = item[key];
+      return sum + (typeof value === "number" && !isNaN(value) ? value : 0);
+    }, 0);
   };
 
   const getPassingStudents = () => {
-    return data.reduce((sum, item) => {
-      // Only count students with aggregate less than 37
-      if (item.aggregate < 37) {
-        return sum + item.total;
-      }
-      return sum;
+    return getValidNumericData().reduce((sum, item) => {
+      return item.aggregate <= 36 ? sum + item.total : sum;
     }, 0);
   };
 
   const getPassingStudentsByGender = (gender) => {
-    return data.reduce((sum, item) => {
-      // Only count students with aggregate less than 37
-      if (item.aggregate < 37) {
-        return sum + item[gender.toLowerCase()];
-      }
-      return sum;
+    const key = gender.toLowerCase();
+    return getValidNumericData().reduce((sum, item) => {
+      const value = item[key];
+      return item.aggregate <= 36
+        ? sum + (typeof value === "number" && !isNaN(value) ? value : 0)
+        : sum;
     }, 0);
   };
 
   const getPassPercentage = () => {
-    const totalStudents = getTotalCandidates();
-    if (!totalStudents) return "0.00";
-    return ((getPassingStudents() / totalStudents) * 100).toFixed(2);
+    const total = getTotalCandidates();
+    return total ? ((getPassingStudents() / total) * 100).toFixed(2) : "0.00";
   };
 
   const getPassPercentageByGender = (gender) => {
-    const totalByGender = getTotalByGender(gender);
-    if (!totalByGender) return "0.00";
-    return ((getPassingStudentsByGender(gender) / totalByGender) * 100).toFixed(
-      2
-    );
+    const total = getTotalByGender(gender);
+    return total
+      ? ((getPassingStudentsByGender(gender) / total) * 100).toFixed(2)
+      : "0.00";
   };
 
-  // Filter out invalid data and calculate average aggregate
-  const validData = data.filter(
-    (item) =>
-      item &&
-      typeof item.aggregate === "number" &&
-      !isNaN(item.aggregate) &&
-      item.total > 0
-  );
-
   const getAverageAggregate = () => {
-    const totalStudents = getTotalCandidates();
-    if (!totalStudents) return 0;
+    const validData = getValidNumericData();
+    const totalStudents = validData.reduce((sum, item) => sum + item.total, 0);
+
+    if (!totalStudents) return "0.00";
 
     const weightedSum = validData.reduce(
       (sum, item) => sum + item.aggregate * item.total,
@@ -81,17 +87,8 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
   };
 
   const getValidAggregateRows = () => {
-    return Array.from({ length: 30 }, (_, i) => i + 6)
-      .map((aggregate) => {
-        const row = data.find((item) => item.aggregate === aggregate) || {
-          aggregate,
-          boys: 0,
-          girls: 0,
-          total: 0,
-        };
-        return row;
-      })
-      .filter((row) => row.total > 0);
+    // Sort data by aggregate score, only including valid numeric data
+    return getValidNumericData().sort((a, b) => a.aggregate - b.aggregate);
   };
 
   const handleExportPDF = () => {
@@ -114,15 +111,15 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
         ],
         [
           "Total Number Of Girls Presented",
-          getTotalByGender("Girls"),
+          getTotalByGender("girls"),
           "Total Number Of Girls Pass",
-          getPassingStudentsByGender("Girls"),
+          getPassingStudentsByGender("girls"),
         ],
         [
           "Total Number Of Boys Presented",
-          getTotalByGender("Boys"),
+          getTotalByGender("boys"),
           "Total Number Of Boys Pass",
-          getPassingStudentsByGender("Boys"),
+          getPassingStudentsByGender("boys"),
         ],
         [
           "Percentage Pass",
@@ -132,13 +129,13 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
         ],
         [
           "Percentage Of Girls Pass",
-          `${getPassPercentageByGender("Girls")}%`,
+          `${getPassPercentageByGender("girls")}%`,
           "",
           "",
         ],
         [
           "Percentage Of Boys Pass",
-          `${getPassPercentageByGender("Boys")}%`,
+          `${getPassPercentageByGender("boys")}%`,
           "",
           "",
         ],
@@ -172,8 +169,6 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
     doc.save("aggregates-analysis-summary.pdf");
   };
 
-  const validRows = getValidAggregateRows();
-
   return (
     <Box sx={{ p: 2 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
@@ -190,7 +185,7 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
       </Box>
 
       <TableContainer component={Paper} sx={{ mb: 3 }}>
-      <Table size="small" sx={{ whiteSpace: "nowrap" }}>
+        <Table size="small" sx={{ whiteSpace: "nowrap" }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: "primary.light" }}>
               <TableCell sx={{ color: "white" }}>Description</TableCell>
@@ -208,15 +203,15 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
             </TableRow>
             <TableRow>
               <TableCell>Total Number Of Girls Presented</TableCell>
-              <TableCell>{getTotalByGender("Girls")}</TableCell>
+              <TableCell>{getTotalByGender("girls")}</TableCell>
               <TableCell>Total Number Of Girls Pass</TableCell>
-              <TableCell>{getPassingStudentsByGender("Girls")}</TableCell>
+              <TableCell>{getPassingStudentsByGender("girls")}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Total Number Of Boys Presented</TableCell>
-              <TableCell>{getTotalByGender("Boys")}</TableCell>
+              <TableCell>{getTotalByGender("boys")}</TableCell>
               <TableCell>Total Number Of Boys Pass</TableCell>
-              <TableCell>{getPassingStudentsByGender("Boys")}</TableCell>
+              <TableCell>{getPassingStudentsByGender("boys")}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Percentage Pass</TableCell>
@@ -226,13 +221,13 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
             </TableRow>
             <TableRow>
               <TableCell>Percentage Of Girls Pass</TableCell>
-              <TableCell>{getPassPercentageByGender("Girls")}%</TableCell>
+              <TableCell>{getPassPercentageByGender("girls")}%</TableCell>
               <TableCell></TableCell>
               <TableCell></TableCell>
             </TableRow>
             <TableRow>
               <TableCell>Percentage Of Boys Pass</TableCell>
-              <TableCell>{getPassPercentageByGender("Boys")}%</TableCell>
+              <TableCell>{getPassPercentageByGender("boys")}%</TableCell>
               <TableCell></TableCell>
               <TableCell></TableCell>
             </TableRow>
@@ -241,7 +236,7 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
       </TableContainer>
 
       <TableContainer component={Paper}>
-      <Table size="small" sx={{ whiteSpace: "nowrap" }}>
+        <Table size="small" sx={{ whiteSpace: "nowrap" }}>
           <TableHead>
             <TableRow sx={{ backgroundColor: "primary.light" }}>
               <TableCell sx={{ color: "white" }}>Aggregate</TableCell>
@@ -251,7 +246,7 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {validRows.map((row) => (
+            {getValidAggregateRows().map((row) => (
               <TableRow key={row.aggregate}>
                 <TableCell>{row.aggregate}</TableCell>
                 <TableCell>{row.boys}</TableCell>

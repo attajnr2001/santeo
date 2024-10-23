@@ -16,103 +16,72 @@ import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import TableViewIcon from "@mui/icons-material/TableView";
 import { exportToPDF, exportToExcel } from "../utils/analysisHelpers";
 
-const SchoolSubjectAnalysis = ({ data }) => {
+const SchoolSubjectAnalysis = ({
+  data,
+  headers,
+  subjectGrades,
+  genderData,
+}) => {
   const [subjectAnalysis, setSubjectAnalysis] = useState([]);
 
-  const SUBJECT_COLUMNS = {
-    F: "English Language",
-    G: "Social Studies",
-    H: "R.M.E",
-    I: "Mathematics",
-    J: "Integrated Science",
-    K: "I.C.T",
-    L: "French",
-    M: "Gh. Language",
-    N: "B.D.T",
-  };
-
   useEffect(() => {
-    if (data && data.length > 0) {
-      const analysis = processSubjectData(data);
-      setSubjectAnalysis(analysis);
-    }
-  }, [data]);
+    if (data && data.length > 0 && headers && subjectGrades && genderData) {
+      // Process the Subject-wise Grade Distribution data
+      console.log("Processing data for analysis");
 
-  const processSubjectData = (rows) => {
-    const analysis = {};
+      // Process the subject data
+      const analysis = Object.entries(subjectGrades).map(
+        ([subject, grades]) => {
+          const noPresented = grades.length;
+          const noPass = grades.filter((grade) => grade <= 6).length;
+          const totalGrades = grades.reduce((sum, grade) => sum + grade, 0);
 
-    // Initialize analysis object for each subject
-    Object.values(SUBJECT_COLUMNS).forEach((subject) => {
-      analysis[subject] = {
-        subjectName: subject,
-        noPresented: 0,
-        noPass: 0,
-        percentage: 0,
-        boysPresented: 0,
-        boysPass: 0,
-        boysPercentage: 0,
-        girlsPresented: 0,
-        girlsPass: 0,
-        girlsPercentage: 0,
-        average: 0,
-        position: 0,
-        totalGrades: 0,
-      };
-    });
+          // Get gender-specific grades from genderData
+          const boysGrades = genderData[subject].M;
+          const girlsGrades = genderData[subject].F;
 
-    // Process each row
-    rows.forEach((row) => {
-      const gender = row.C;
+          const boysPresented = boysGrades.length;
+          const boysPass = boysGrades.filter((grade) => grade <= 6).length;
 
-      Object.entries(SUBJECT_COLUMNS).forEach(([col, subject]) => {
-        const grade = parseInt(row[col]);
-        if (!isNaN(grade)) {
-          const subjectData = analysis[subject];
+          const girlsPresented = girlsGrades.length;
+          const girlsPass = girlsGrades.filter((grade) => grade <= 6).length;
 
-          // Update total counts
-          subjectData.noPresented++;
-          subjectData.totalGrades += grade;
-          if (grade <= 6) subjectData.noPass++;
-
-          // Update gender-specific counts
-          if (gender === "M") {
-            subjectData.boysPresented++;
-            if (grade <= 6) subjectData.boysPass++;
-          } else if (gender === "F") {
-            subjectData.girlsPresented++;
-            if (grade <= 6) subjectData.girlsPass++;
-          }
+          return {
+            subjectName: subject,
+            noPresented,
+            noPass,
+            percentage: noPresented
+              ? ((noPass / noPresented) * 100).toFixed(2)
+              : "0.00",
+            boysPresented,
+            boysPass,
+            boysPercentage: boysPresented
+              ? ((boysPass / boysPresented) * 100).toFixed(2)
+              : "0.00",
+            girlsPresented,
+            girlsPass,
+            girlsPercentage: girlsPresented
+              ? ((girlsPass / girlsPresented) * 100).toFixed(2)
+              : "0.00",
+            average: noPresented
+              ? (totalGrades / noPresented).toFixed(2)
+              : "0.00",
+          };
         }
-      });
-    });
+      );
 
-    // Calculate percentages and averages
-    Object.values(analysis).forEach((subject) => {
-      subject.percentage = (
-        (subject.noPass / subject.noPresented) *
-        100
-      ).toFixed(2);
-      subject.boysPercentage = (
-        (subject.boysPass / subject.boysPresented) *
-        100
-      ).toFixed(2);
-      subject.girlsPercentage = (
-        (subject.girlsPass / subject.girlsPresented) *
-        100
-      ).toFixed(2);
-      subject.average = (subject.totalGrades / subject.noPresented).toFixed(2);
-    });
+      // Sort by average and assign positions
+      const sortedAnalysis = analysis
+        .sort((a, b) => parseFloat(b.average) - parseFloat(a.average))
+        .map((subject, index) => ({
+          ...subject,
+          position: index + 1,
+        }));
 
-    // Calculate positions based on average scores
-    const sortedSubjects = Object.values(analysis).sort(
-      (a, b) => a.average - b.average
-    );
-    sortedSubjects.forEach((subject, index) => {
-      subject.position = index + 1;
-    });
-
-    return Object.values(analysis);
-  };
+      console.log("Processed Analysis:", sortedAnalysis);
+      setSubjectAnalysis(sortedAnalysis);
+    }
+  }, [data, headers, subjectGrades, genderData]);
 
   const handleExport = (format) => {
     const exportData = subjectAnalysis.map((subject) => ({
@@ -183,7 +152,13 @@ const SchoolSubjectAnalysis = ({ data }) => {
           >
             Export PDF
           </Button>
-          
+          <Button
+            variant="outlined"
+            startIcon={<TableViewIcon />}
+            onClick={() => handleExport("excel")}
+          >
+            Export Excel
+          </Button>
         </Stack>
       </Stack>
 

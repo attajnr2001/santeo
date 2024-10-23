@@ -1,4 +1,4 @@
-// components/AggregateDistribution.jsx
+// AggregateDistribution
 import React from "react";
 import {
   Box,
@@ -12,7 +12,6 @@ import {
   TableRow,
 } from "@mui/material";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import TableViewIcon from "@mui/icons-material/TableView";
 
 const AggregateDistribution = ({ data, onExport }) => {
   return (

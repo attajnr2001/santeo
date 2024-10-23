@@ -26,7 +26,6 @@ import AggregatesAnalysisSummary from "./AggregatesAnalysisSummary";
 import SchoolSubjectAnalysis from "./SchoolSubjectAnalysis";
 import SubjectsGradeAnalysis from "./SubjectsGradeAnalysis";
 import {
-  parseResults,
   calculateAggregate,
   exportToPDF,
   exportToExcel,
@@ -58,6 +57,11 @@ const Home = () => {
   const [selectedFile, setSelectedFile] = useState("");
   const { currentUser } = useContext(AuthContext);
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [processedData, setProcessedData] = useState({
+    headers: {},
+    data: [],
+    subjectGrades: {},
+  });
 
   useEffect(() => {
     if (currentUser) {
@@ -105,26 +109,92 @@ const Home = () => {
     }
   };
 
+  const processSubjectGrades = (jsonData, headers) => {
+    const subjectGrades = {};
+    const processedHeaders = {};
+    const genderData = {}; // Add gender-specific tracking
+
+    // Initialize subject arrays and process headers
+    for (let prop in headers) {
+      if (prop.charCodeAt(0) - 65 >= 8) {
+        // Starting from column I
+        const subjectName = headers[prop];
+        if (subjectName) {
+          const upperSubject = subjectName.toUpperCase();
+          subjectGrades[upperSubject] = [];
+          genderData[upperSubject] = {
+            M: [],
+            F: [],
+          };
+          processedHeaders[prop] = upperSubject;
+        }
+      }
+    }
+
+    // Process each row and collect grades by subject
+    const processedRows = jsonData.slice(1).map((row) => {
+      const processedRow = { ...row };
+      const gender = row["F"]; // Get gender from column F
+
+      for (let prop in processedHeaders) {
+        const subjectName = processedHeaders[prop];
+        const grade = parseInt(row[prop]);
+        if (!isNaN(grade)) {
+          subjectGrades[subjectName].push(grade);
+          processedRow[prop] = grade;
+
+          // Track gender-specific grades
+          if (gender === "M" || gender === "F") {
+            genderData[subjectName][gender].push(grade);
+          }
+        }
+      }
+      return processedRow;
+    });
+
+    return {
+      headers: processedHeaders,
+      data: processedRows,
+      subjectGrades,
+      genderData,
+    };
+  };
+
   const handleFileSelect = async (fileName) => {
     try {
       const fileRef = ref(
         storage,
         `results/${currentUser.uid}/${fileName}.xlsx`
       );
-  
+
       const bytes = await getBytes(fileRef);
       const data = bytes.buffer;
-  
+
       const workbook = read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = utils.sheet_to_json(worksheet, { header: "A" });
-  
+
+      // Add logging
+      console.log("Selected File Data:", {
+        fileName,
+        rawData: jsonData,
+        numberOfRows: jsonData.length,
+      });
+
       // Check if jsonData is valid
       if (!jsonData || jsonData.length === 0) {
         throw new Error("No data found in the selected file.");
       }
-  
-      const rows = jsonData.slice(1); // Only if jsonData is valid
+
+      const rows = jsonData.slice(1);
+
+      // Process and log subject-wise grades
+      const headers = jsonData[0];
+      const subjectGrades = processSubjectGrades(jsonData, headers);
+      console.log("Subject-wise Grade Distribution:", subjectGrades);
+
+      // Log processed rows
+      console.log("Processed Rows:", rows);
 
       setExcelData(rows);
 
@@ -132,7 +202,7 @@ const Home = () => {
 
       rows.forEach((row) => {
         const resultsString = row["E"];
-        const gender = row["C"];
+        const gender = Frow["C"];
 
         if (!resultsString) return;
 
@@ -159,11 +229,118 @@ const Home = () => {
         (a, b) => a.aggregate - b.aggregate
       );
 
+      // Log final processed data
+      console.log("Aggregate Distribution:", sortedData);
+
       setAggregateData(sortedData);
       setError("");
     } catch (error) {
       console.error("Error loading selected file:", error);
       setError("Failed to load selected file");
+    }
+  };
+
+  const processExcelFile = async (file) => {
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = utils.sheet_to_json(worksheet, { header: "A" });
+
+      const headers = jsonData[0];
+      const processed = processSubjectGrades(jsonData, headers);
+
+      setProcessedData(processed);
+      setExcelData(processed.data);
+
+      const subjectHeaders = {};
+      for (let prop in headers) {
+        if (prop.charCodeAt(0) - 65 >= 8) {
+          subjectHeaders[prop] = headers[prop];
+        }
+      }
+
+      // Process and log subject-wise grades
+      const subjectGrades = processSubjectGrades(jsonData, headers);
+      console.log("Subject-wise Grade Distribution:", subjectGrades);
+
+      // Log extracted headers
+      console.log("Subject Headers:", subjectHeaders);
+
+      const rows = jsonData.slice(1);
+      setExcelData(rows);
+
+      // Process grades for each student
+      const aggregateDistribution = {};
+
+      rows.forEach((row) => {
+        const gender = row["F"];
+
+        const coreGrades = [];
+        const otherGrades = [];
+
+        for (let prop in row) {
+          if (prop.charCodeAt(0) - 65 >= 8) {
+            const subjectName = subjectHeaders[prop];
+            const grade = parseInt(row[prop]);
+
+            if (
+              [
+                "ENGLISH LANGUAGE",
+                "SOCIAL STUDIES",
+                "MATHEMATICS",
+                "INTEGRATED SCIENCE",
+              ].includes(subjectName?.toUpperCase())
+            ) {
+              coreGrades.push(grade);
+            } else {
+              otherGrades.push(grade);
+            }
+          }
+        }
+
+        otherGrades.sort((a, b) => a - b);
+        const bestTwoGrades = otherGrades.slice(0, 2);
+
+        const aggregate = [...coreGrades, ...bestTwoGrades].reduce(
+          (sum, grade) => sum + grade,
+          0
+        );
+
+        if (!aggregateDistribution[aggregate]) {
+          aggregateDistribution[aggregate] = {
+            aggregate,
+            total: 0,
+            boys: 0,
+            girls: 0,
+          };
+        }
+
+        aggregateDistribution[aggregate].total += 1;
+        if (gender === "M") {
+          aggregateDistribution[aggregate].boys += 1;
+        } else if (gender === "F") {
+          aggregateDistribution[aggregate].girls += 1;
+        }
+      });
+
+      const sortedData = Object.values(aggregateDistribution).sort(
+        (a, b) => a.aggregate - b.aggregate
+      );
+
+      // Log final processed data
+      console.log("Processed Data:", {
+        rows: rows.length,
+        aggregateDistribution: sortedData,
+      });
+
+      setAggregateData(sortedData);
+      setError("");
+    } catch (err) {
+      console.error("Error processing file:", err);
+      setError(
+        "Error processing file. Please ensure the file format matches the expected structure."
+      );
     }
   };
 
@@ -192,59 +369,6 @@ const Home = () => {
       );
     } else {
       exportToExcel(data, "Aggregate Distribution", "aggregate-distribution");
-    }
-  };
-
-  const processExcelFile = async (file) => {
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = read(data);
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = utils.sheet_to_json(worksheet, { header: "A" });
-      const rows = jsonData.slice(1);
-
-      // Store the Excel data
-      setExcelData(rows);
-
-      // Process aggregate distribution
-      const aggregateDistribution = {};
-
-      rows.forEach((row) => {
-        const resultsString = row["E"];
-        const gender = row["C"];
-
-        if (!resultsString) return;
-
-        const aggregate = calculateAggregate(resultsString);
-
-        if (!aggregateDistribution[aggregate]) {
-          aggregateDistribution[aggregate] = {
-            aggregate,
-            total: 0,
-            boys: 0,
-            girls: 0,
-          };
-        }
-
-        aggregateDistribution[aggregate].total += 1;
-        if (gender === "M") {
-          aggregateDistribution[aggregate].boys += 1;
-        } else if (gender === "F") {
-          aggregateDistribution[aggregate].girls += 1;
-        }
-      });
-
-      const sortedData = Object.values(aggregateDistribution).sort(
-        (a, b) => a.aggregate - b.aggregate
-      );
-
-      setAggregateData(sortedData);
-      setError("");
-    } catch (err) {
-      setError(
-        "Error processing file. Please ensure the file format matches the expected structure."
-      );
-      console.error(err);
     }
   };
 
@@ -335,11 +459,21 @@ const Home = () => {
         </TabPanel>
 
         <TabPanel value={currentTab} index={2}>
-          <SchoolSubjectAnalysis data={excelData} />
+          <SchoolSubjectAnalysis
+            data={processedData.data}
+            headers={processedData.headers}
+            subjectGrades={processedData.subjectGrades}
+            genderData={processedData.genderData}
+          />
         </TabPanel>
 
         <TabPanel value={currentTab} index={3}>
-          <SubjectsGradeAnalysis data={excelData} />
+          <SubjectsGradeAnalysis
+            data={processedData.data}
+            headers={processedData.headers}
+            subjectGrades={processedData.subjectGrades}
+            genderData={processedData.genderData}
+          />{" "}
         </TabPanel>
       </Paper>
 
