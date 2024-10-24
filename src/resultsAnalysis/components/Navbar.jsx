@@ -107,7 +107,7 @@ const Navbar = () => {
               fontWeight: "bold",
               letterSpacing: 1,
               display: "flex",
-              alignItems: "center"
+              alignItems: "center",
             }}
           >
             <img
@@ -119,7 +119,7 @@ const Navbar = () => {
                 objectFit: "contain",
               }}
             />
-            SANTEO
+            ARCHBISHOP ANDOH R/C BASIC SCHOOL
           </Typography>
 
           <Box sx={{ display: "flex", gap: 2 }}>
