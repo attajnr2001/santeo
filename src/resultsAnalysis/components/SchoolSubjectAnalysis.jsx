@@ -13,8 +13,8 @@ import {
   Stack,
 } from "@mui/material";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import TableViewIcon from "@mui/icons-material/TableView";
-import { exportToPDF, exportToExcel } from "../utils/analysisHelpers";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 const SchoolSubjectAnalysis = ({
   data,
@@ -83,55 +83,106 @@ const SchoolSubjectAnalysis = ({
     }
   }, [data, headers, subjectGrades, genderData]);
 
-  const handleExport = (format) => {
-    const exportData = subjectAnalysis.map((subject) => ({
-      "Subject Name": subject.subjectName,
-      "No. Presented": subject.noPresented,
-      "No. Pass": subject.noPass,
-      Percentage: subject.percentage + "%",
-      "Boys Presented": subject.boysPresented,
-      "Boys Pass": subject.boysPass,
-      "Boys Percentage": subject.boysPercentage + "%",
-      "Girls Presented": subject.girlsPresented,
-      "Girls Pass": subject.girlsPass,
-      "Girls Percentage": subject.girlsPercentage + "%",
-      Average: subject.average,
-      Position: subject.position,
-    }));
+  const handleExportPDF = () => {
+    const doc = new jsPDF("l"); // Set to landscape orientation for better table fit
 
-    if (format === "pdf") {
-      const tableData = subjectAnalysis.map((subject) => [
+    // Add school logo
+    const img = new Image();
+    img.src = "/icon.jpg";
+
+    // Add logo once it's loaded
+    doc.addImage(img, "JPEG", 15, 10, 25, 25);
+
+    // School name and address styling
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("ARCHBISHOP ANDOH R/C BASIC SCHOOL", 50, 20, { align: "left" });
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("P.O.BOX CE 12275, TEMA", 50, 28, { align: "left" });
+
+    // Add a line under the header
+    doc.setLineWidth(0.5);
+    doc.line(15, 40, 280, 40); // Extended line for landscape orientation
+
+    // Report title
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("SCHOOL SUBJECT ANALYSIS", 148, 55, { align: "center" });
+
+    // Create the table data
+    doc.autoTable({
+      startY: 65,
+      head: [
+        [
+          { content: "Subject Name", rowSpan: 2 },
+          { content: "TOTAL", colSpan: 3 },
+          { content: "BOYS", colSpan: 3 },
+          { content: "GIRLS", colSpan: 3 },
+          { content: "Average", rowSpan: 2 },
+          { content: "Position", rowSpan: 2 },
+        ],
+        [
+          "No. Presented",
+          "No. Pass",
+          "Percentage",
+          "Presented",
+          "Pass",
+          "Percentage",
+          "Presented",
+          "Pass",
+          "Percentage",
+        ],
+      ],
+      body: subjectAnalysis.map((subject) => [
         subject.subjectName,
         subject.noPresented,
         subject.noPass,
-        subject.percentage + "%",
+        `${subject.percentage}%`,
         subject.boysPresented,
         subject.boysPass,
-        subject.boysPercentage + "%",
+        `${subject.boysPercentage}%`,
         subject.girlsPresented,
         subject.girlsPass,
-        subject.girlsPercentage + "%",
+        `${subject.girlsPercentage}%`,
         subject.average,
         subject.position,
-      ]);
+      ]),
+      theme: "grid",
+      headStyles: {
+        fillColor: [100, 149, 237],
+        halign: "center",
+        valign: "middle",
+        fontSize: 9,
+      },
+      columnStyles: {
+        0: { cellWidth: 40 },
+        1: { cellWidth: 20, halign: "right" },
+        2: { cellWidth: 20, halign: "right" },
+        3: { cellWidth: 20, halign: "right" },
+        4: { cellWidth: 20, halign: "right" },
+        5: { cellWidth: 20, halign: "right" },
+        6: { cellWidth: 20, halign: "right" },
+        7: { cellWidth: 20, halign: "right" },
+        8: { cellWidth: 20, halign: "right" },
+        9: { cellWidth: 20, halign: "right" },
+        10: { cellWidth: 20, halign: "right" },
+        11: { cellWidth: 20, halign: "right" },
+      },
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+      },
+    });
 
-      exportToPDF(tableData, "School Subject Analysis", [
-        "Subject",
-        "No. Presented",
-        "No. Pass",
-        "Percentage",
-        "Boys Presented",
-        "Boys Pass",
-        "Boys %",
-        "Girls Presented",
-        "Girls Pass",
-        "Girls %",
-        "Average",
-        "Position",
-      ]);
-    } else {
-      exportToExcel(exportData, "School Subject Analysis", "subject-analysis");
-    }
+    // Add date at the bottom
+    const date = new Date().toLocaleDateString();
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.text(`Generated on: ${date}`, 15, doc.internal.pageSize.height - 10);
+
+    doc.save("school-subject-analysis.pdf");
   };
 
   return (
@@ -148,16 +199,9 @@ const SchoolSubjectAnalysis = ({
           <Button
             variant="outlined"
             startIcon={<PictureAsPdfIcon />}
-            onClick={() => handleExport("pdf")}
+            onClick={handleExportPDF}
           >
             Export PDF
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<TableViewIcon />}
-            onClick={() => handleExport("excel")}
-          >
-            Export Excel
           </Button>
         </Stack>
       </Stack>

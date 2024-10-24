@@ -11,7 +11,7 @@ import Login from "./resultsAnalysis/pages/Login";
 import Dashboard from "./resultsAnalysis/pages/Dashboard";
 import Home from "./resultsAnalysis/components/Home";
 import ProtectedRoute from "./resultsAnalysis/components/ProtectedRoute";
-import { AuthContextProvider } from './resultsAnalysis/context/AuthContext';
+import { AuthContextProvider } from "./resultsAnalysis/context/AuthContext";
 
 const App = () => {
   const router = createBrowserRouter(

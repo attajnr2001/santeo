@@ -106,8 +106,19 @@ const Navbar = () => {
               flexGrow: 1,
               fontWeight: "bold",
               letterSpacing: 1,
+              display: "flex",
+              alignItems: "center"
             }}
           >
+            <img
+              src="/icon.jpg"
+              alt="Santeo Logo"
+              style={{
+                height: "30px", // Adjust this value to match your desired logo size
+                marginRight: "10px", // Add some spacing between logo and text
+                objectFit: "contain",
+              }}
+            />
             SANTEO
           </Typography>
 

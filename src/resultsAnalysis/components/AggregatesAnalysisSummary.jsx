@@ -94,13 +94,34 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
   const handleExportPDF = () => {
     const doc = new jsPDF();
 
-    // Title
-    doc.setFontSize(16);
-    doc.text("AGGREGATES ANALYSIS SUMMARY", 15, 15);
+    // Add school logo
+    const img = new Image();
+    img.src = "/icon.jpg";
 
-    // Summary table
+    // Add logo once it's loaded
+    doc.addImage(img, "JPEG", 15, 10, 25, 25); // Adjust x, y, width, height as needed
+
+    // School name and address styling
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("ARCHBISHOP ANDOH R/C BASIC SCHOOL", 50, 20, { align: "left" });
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("P.O.BOX CE 12275, TEMA", 50, 28, { align: "left" });
+
+    // Add a line under the header
+    doc.setLineWidth(0.5);
+    doc.line(15, 40, 195, 40);
+
+    // Report title
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("AGGREGATES ANALYSIS SUMMARY", 105, 55, { align: "center" });
+
+    // Summary table - moved down to accommodate header
     doc.autoTable({
-      startY: 25,
+      startY: 65,
       head: [["Description", "Value", "Description", "Value"]],
       body: [
         [
@@ -165,6 +186,12 @@ const AggregatesAnalysisSummary = ({ data = [] }) => {
       theme: "grid",
       headStyles: { fillColor: [100, 149, 237] },
     });
+
+    // Add current date at the bottom
+    const date = new Date().toLocaleDateString();
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.text(`Generated on: ${date}`, 15, doc.internal.pageSize.height - 10);
 
     doc.save("aggregates-analysis-summary.pdf");
   };

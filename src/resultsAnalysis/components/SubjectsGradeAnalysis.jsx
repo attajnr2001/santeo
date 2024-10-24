@@ -14,6 +14,8 @@ import {
   Button,
   Stack,
 } from "@mui/material";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 const SubjectsGradeAnalysis = ({
   data,
@@ -66,6 +68,124 @@ const SubjectsGradeAnalysis = ({
     return subjectGradesData;
   };
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+
+    // Add school logo
+    const img = new Image();
+    img.src = "/icon.jpg";
+    doc.addImage(img, "JPEG", 15, 10, 25, 25);
+
+    // School name and address styling
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("ARCHBISHOP ANDOH R/C BASIC SCHOOL", 50, 20, { align: "left" });
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text("P.O.BOX CE 12275, TEMA", 50, 28, { align: "left" });
+
+    // Add a line under the header
+    doc.setLineWidth(0.5);
+    doc.line(15, 40, 195, 40);
+
+    // Report title
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("SUBJECTS GRADE ANALYSIS", 105, 55, { align: "center" });
+
+    let yPos = 65; // Start tables after the header
+
+    // Process each subject table
+    Object.entries(subjectsData).forEach(([subject, gradeData]) => {
+      // Calculate totals for the subject
+      const grades = Object.keys(gradeData)
+        .map(Number)
+        .sort((a, b) => a - b);
+
+      const totals = grades.reduce(
+        (acc, grade) => {
+          acc.girls += gradeData[grade].girls;
+          acc.boys += gradeData[grade].boys;
+          acc.total += gradeData[grade].total;
+          return acc;
+        },
+        { girls: 0, boys: 0, total: 0 }
+      );
+
+      // Add subject title
+      doc.setFontSize(12);
+      doc.text(subject, 15, yPos);
+      yPos += 5;
+
+      // Create table data for the subject
+      const tableData = {
+        head: [["Grade", "Girls", "Boys", "Total"]],
+        body: [
+          ...grades.map((grade) => [
+            grade.toString(),
+            gradeData[grade].girls,
+            gradeData[grade].boys,
+            gradeData[grade].total,
+          ]),
+          // Add totals row
+          ["Total", totals.girls, totals.boys, totals.total],
+        ],
+      };
+
+      // Add the table
+      doc.autoTable({
+        startY: yPos,
+        head: tableData.head,
+        body: tableData.body,
+        theme: "grid",
+        headStyles: {
+          fillColor: [100, 149, 237],
+          textColor: 255,
+          fontStyle: "bold",
+        },
+        columnStyles: {
+          0: { cellWidth: 20 },
+          1: { cellWidth: 20, halign: "right" },
+          2: { cellWidth: 20, halign: "right" },
+          3: { cellWidth: 20, halign: "right" },
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        footStyles: {
+          fontStyle: "bold",
+          fillColor: [240, 240, 240],
+        },
+        // Style the totals row
+        didParseCell: function (data) {
+          if (data.row.index === tableData.body.length - 1) {
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = [240, 240, 240];
+          }
+        },
+      });
+
+      // Update yPos for next table
+      yPos = doc.lastAutoTable.finalY + 15;
+
+      // Add new page if needed
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 15;
+      }
+    });
+
+    // Add current date at the bottom of the last page
+    const date = new Date().toLocaleDateString();
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.text(`Generated on: ${date}`, 15, doc.internal.pageSize.height - 10);
+
+    doc.save("subjects-grade-analysis.pdf");
+  };
+
   const SubjectTable = ({ subject, gradeData }) => {
     const grades = Object.keys(gradeData)
       .map(Number)
@@ -90,15 +210,31 @@ const SubjectsGradeAnalysis = ({
         <TableContainer component={Paper}>
           <Table size="small" sx={{ whiteSpace: "nowrap" }}>
             <TableHead>
-              <TableRow sx={{ backgroundColor: "primary.light" }}>
-                <TableCell className="text-white font-bold">Grade</TableCell>
-                <TableCell className="text-white font-bold text-right">
+              <TableRow
+                sx={{ backgroundColor: "primary.light", color: "white" }}
+              >
+                <TableCell
+                  sx={{ color: "white" }}
+                  className="text-white font-bold"
+                >
+                  Grade
+                </TableCell>
+                <TableCell
+                  sx={{ color: "white" }}
+                  className="text-white font-bold text-right"
+                >
                   Girls
                 </TableCell>
-                <TableCell className="text-white font-bold text-right">
+                <TableCell
+                  sx={{ color: "white" }}
+                  className="text-white font-bold text-right"
+                >
                   Boys
                 </TableCell>
-                <TableCell className="text-white font-bold text-right">
+                <TableCell
+                  sx={{ color: "white" }}
+                  className="text-white font-bold text-right"
+                >
                   Total
                 </TableCell>
               </TableRow>
@@ -107,16 +243,16 @@ const SubjectsGradeAnalysis = ({
               {grades.map((grade) => (
                 <TableRow key={grade} className="hover:bg-gray-50">
                   <TableCell>{grade}</TableCell>
-                  <TableCell align="right">{gradeData[grade].girls}</TableCell>
-                  <TableCell align="right">{gradeData[grade].boys}</TableCell>
-                  <TableCell align="right">{gradeData[grade].total}</TableCell>
+                  <TableCell>{gradeData[grade].girls}</TableCell>
+                  <TableCell>{gradeData[grade].boys}</TableCell>
+                  <TableCell>{gradeData[grade].total}</TableCell>
                 </TableRow>
               ))}
               <TableRow className="bg-gray-100 font-bold">
                 <TableCell>Total</TableCell>
-                <TableCell align="right">{totals.girls}</TableCell>
-                <TableCell align="right">{totals.boys}</TableCell>
-                <TableCell align="right">{totals.total}</TableCell>
+                <TableCell>{totals.girls}</TableCell>
+                <TableCell>{totals.boys}</TableCell>
+                <TableCell>{totals.total}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -132,7 +268,7 @@ const SubjectsGradeAnalysis = ({
           Subjects Grade Analysis
         </Typography>
         <Stack direction="row" className="space-x-2">
-          <Button variant="outlined" onClick={() => handleExport("pdf")}>
+          <Button variant="outlined" onClick={handleExportPDF}>
             <PictureAsPdfIcon />
             Export PDF
           </Button>
